@@ -8,8 +8,10 @@
     stopInference,
     type LocalModel,
   } from "../api";
+  import { groupShards, shardBaseName, shardInfo, type Group } from "../shard";
 
   let local = $state<LocalModel[]>([]);
+  let groups = $state<Group<LocalModel>[]>([]);
   let loading = $state(true);
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -28,6 +30,8 @@
     loading = true;
     try {
       local = await listLocalModels();
+      groups = groupShards(local);
+      groups.sort((a, b) => b.totalSize - a.totalSize);
     } catch (e) {
       error = String(e);
     } finally {
@@ -35,7 +39,23 @@
     }
   }
 
-  async function load(m: LocalModel) {
+  function groupStatus(g: Group<LocalModel>): {
+    complete: boolean;
+    have: number;
+    total: number;
+  } {
+    const info = shardInfo(g.rep.file);
+    if (!info) return { complete: true, have: 1, total: 1 };
+    return { complete: g.members.length >= info.total, have: g.members.length, total: info.total };
+  }
+
+  async function loadGroup(g: Group<LocalModel>) {
+    const m = g.rep;
+    const status = groupStatus(g);
+    if (!status.complete) {
+      error = `incomplete: ${status.have} of ${status.total} parts present`;
+      return;
+    }
     busy = m.path;
     stage = "spawning…";
     percent = null;
@@ -57,9 +77,6 @@
     }
   }
 
-  function isMmproj(file: string): boolean {
-    return file.toLowerCase().startsWith("mmproj");
-  }
 </script>
 
 <section class="view">
@@ -70,24 +87,28 @@
 
   {#if loading}
     <p class="hint">loading…</p>
-  {:else if local.length === 0}
+  {:else if groups.length === 0}
     <div class="empty">
       <p class="hint">no models yet</p>
       <button onclick={() => (app.section = "discover")}>browse discover</button>
     </div>
   {:else}
     <div class="list">
-      {#each local as m}
+      {#each groups as g}
+        {@const m = g.rep}
         {@const active = app.activeModel?.path === m.path}
-        {@const mmproj = isMmproj(m.file)}
+        {@const st = groupStatus(g)}
         <div class="row" class:active>
           <div class="info">
-            <div class="file">{m.file}</div>
+            <div class="file">{shardBaseName(m.file)}</div>
             <div class="meta">
               <span class="repo">{m.repo}</span>
-              <span class="size">{formatBytes(m.size)}</span>
-              {#if mmproj}
-                <span class="tag-warn">vision projector</span>
+              <span class="size">{formatBytes(g.totalSize)}</span>
+              {#if g.shardCount > 1}
+                <span class="shards">{st.have}/{st.total} parts</span>
+              {/if}
+              {#if !st.complete}
+                <span class="tag-warn">incomplete</span>
               {/if}
             </div>
             {#if busy === m.path}
@@ -108,12 +129,12 @@
           </div>
           {#if active}
             <span class="badge">loaded</span>
-          {:else if mmproj}
-            <span class="badge-mute" title="vision projector, not a model">skip</span>
+          {:else if !st.complete}
+            <span class="badge-mute" title="missing shards">incomplete</span>
           {:else}
             <button
               disabled={!!busy}
-              onclick={() => load(m)}
+              onclick={() => loadGroup(g)}
             >
               {busy === m.path ? "loading…" : "load"}
             </button>
@@ -259,9 +280,17 @@
   .tag-warn {
     color: var(--warn);
     background: var(--warn-bg);
-    padding: 1px 8px;
+    padding: 2px 9px;
     border-radius: var(--r-sm);
-    font-size: 10px;
+    font-size: 11px;
+  }
+  .shards {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    padding: 2px 9px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r-sm);
   }
   .badge-mute {
     font-family: var(--mono);

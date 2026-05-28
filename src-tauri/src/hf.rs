@@ -67,18 +67,38 @@ pub struct LocalModel {
     pub size: u64,
 }
 
+const REJECT_MODEL_TAGS: &[&str] = &[
+    "text-to-image",
+    "image-to-image",
+    "stable-diffusion",
+    "stable-diffusion-xl",
+    "flux",
+    "diffusion",
+    "text-to-video",
+    "image-to-video",
+    "controlnet",
+    "lora",
+    "comfyui",
+    "automatic-image-captioning",
+    "feature-extraction",
+    "sentence-similarity",
+    "image-classification",
+    "object-detection",
+];
+
 #[tauri::command]
 pub async fn search_hf_models(
     query: String,
     sort: Option<String>,
     tags: Vec<String>,
 ) -> Result<Vec<HfModel>, String> {
-    let sort = sort.unwrap_or_else(|| "trending".to_string());
+    let sort = sort.unwrap_or_else(|| "trendingScore".to_string());
     let mut params = vec![
         ("filter".to_string(), "gguf".to_string()),
+        ("pipeline_tag".to_string(), "text-generation".to_string()),
         ("sort".to_string(), sort),
         ("direction".to_string(), "-1".to_string()),
-        ("limit".to_string(), "40".to_string()),
+        ("limit".to_string(), "60".to_string()),
         ("full".to_string(), "true".to_string()),
     ];
     if !query.trim().is_empty() {
@@ -97,7 +117,18 @@ pub async fn search_hf_models(
     if !resp.status().is_success() {
         return Err(format!("hf status {}", resp.status()));
     }
-    resp.json::<Vec<HfModel>>().await.map_err(|e| e.to_string())
+    let models: Vec<HfModel> = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(models
+        .into_iter()
+        .filter(|m| {
+            let lower_tags: Vec<String> =
+                m.tags.iter().map(|t| t.to_lowercase()).collect();
+            !lower_tags
+                .iter()
+                .any(|t| REJECT_MODEL_TAGS.iter().any(|r| t == r))
+        })
+        .take(40)
+        .collect())
 }
 
 fn is_llm_file(name: &str) -> bool {
@@ -107,19 +138,34 @@ fn is_llm_file(name: &str) -> bool {
     if !base.ends_with(".gguf") {
         return false;
     }
-    if base.starts_with("mmproj") || base.contains(".mmproj") {
+    const REJECT_PREFIXES: &[&str] = &[
+        "mmproj",
+        "tokenizer",
+        "vae",
+        "ae",
+        "clip_",
+        "clip-",
+        "t5xxl",
+        "unet",
+        "controlnet",
+        "flux1",
+        "flux-",
+    ];
+    if REJECT_PREFIXES.iter().any(|p| base.starts_with(p)) {
         return false;
     }
-    if base.starts_with("tokenizer") {
-        return false;
-    }
-    if base.contains("embed") || base.contains("embedding") {
-        return false;
-    }
-    if base.contains("rerank") {
-        return false;
-    }
-    if base.contains("draft") {
+    const REJECT_SUBSTR: &[&str] = &[
+        ".mmproj",
+        "embed",
+        "rerank",
+        "draft",
+        "stable-diffusion",
+        "sdxl",
+        "diffusion",
+        "wan2",
+        "hunyuan-video",
+    ];
+    if REJECT_SUBSTR.iter().any(|p| base.contains(p)) {
         return false;
     }
     true
@@ -251,26 +297,49 @@ pub async fn list_local_models() -> Result<Vec<LocalModel>, String> {
     let mut out = vec![];
     let mut repos = fs::read_dir(&root).await.map_err(|e| e.to_string())?;
     while let Some(repo_entry) = repos.next_entry().await.map_err(|e| e.to_string())? {
-        if !repo_entry.file_type().await.map_err(|e| e.to_string())?.is_dir() {
+        let ft = repo_entry.file_type().await.map_err(|e| e.to_string())?;
+        if !ft.is_dir() {
             continue;
         }
         let repo_name = repo_entry.file_name().to_string_lossy().replace("__", "/");
-        let mut files = fs::read_dir(repo_entry.path()).await.map_err(|e| e.to_string())?;
-        while let Some(f) = files.next_entry().await.map_err(|e| e.to_string())? {
-            let path = f.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("gguf") {
+        walk(&repo_entry.path(), repo_entry.path().clone(), &repo_name, &mut out).await?;
+    }
+    Ok(out)
+}
+
+async fn walk(
+    dir: &std::path::Path,
+    root: PathBuf,
+    repo_name: &str,
+    out: &mut Vec<LocalModel>,
+) -> Result<(), String> {
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let mut entries = fs::read_dir(&d).await.map_err(|e| e.to_string())?;
+        while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+            let p = entry.path();
+            let ft = entry.file_type().await.map_err(|e| e.to_string())?;
+            if ft.is_dir() {
+                stack.push(p);
                 continue;
             }
-            let meta = f.metadata().await.map_err(|e| e.to_string())?;
+            if p.extension().and_then(|s| s.to_str()) != Some("gguf") {
+                continue;
+            }
+            let rel = p
+                .strip_prefix(&root)
+                .map(|r| r.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| p.file_name().unwrap().to_string_lossy().into_owned());
+            let meta = entry.metadata().await.map_err(|e| e.to_string())?;
             out.push(LocalModel {
-                repo: repo_name.clone(),
-                file: f.file_name().to_string_lossy().into_owned(),
-                path: path.clone(),
+                repo: repo_name.to_string(),
+                file: rel,
+                path: p,
                 size: meta.len(),
             });
         }
     }
-    Ok(out)
+    Ok(())
 }
 
 fn urlencoding(s: &str) -> String {

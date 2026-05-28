@@ -12,6 +12,7 @@
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
   import { parseQuant, quantTier } from "../quant";
+  import { groupShards, shardInfo, shardBaseName, type Group } from "../shard";
 
   type Sort = "trendingScore" | "downloads" | "likes" | "lastModified";
 
@@ -39,8 +40,9 @@
   let results = $state<HfModel[]>([]);
   let searching = $state(false);
   let expanded = $state<string | null>(null);
-  let files = $state<Record<string, HfFile[]>>({});
+  let files = $state<Record<string, Group<HfFile>[]>>({});
   let downloads = $state<Record<string, DownloadProgress>>({});
+  let pulling = $state<Record<string, boolean>>({});
   let error = $state<string | null>(null);
 
   onDownloadProgress((p) => {
@@ -83,35 +85,64 @@
     if (!files[repo]) {
       try {
         const list = await listHfFiles(repo);
-        list.sort((a, b) => {
-          const qa = parseQuant(a.path)?.quality ?? 0;
-          const qb = parseQuant(b.path)?.quality ?? 0;
+        const grouped = groupShards(list);
+        grouped.sort((a, b) => {
+          const qa = parseQuant(a.rep.path)?.quality ?? 0;
+          const qb = parseQuant(b.rep.path)?.quality ?? 0;
           if (qa !== qb) return qb - qa;
-          return a.size - b.size;
+          return a.totalSize - b.totalSize;
         });
-        files[repo] = list;
+        files[repo] = grouped;
       } catch (e) {
         error = String(e);
       }
     }
   }
 
-  async function pull(repo: string, file: HfFile) {
-    const key = `${repo}/${file.path}`;
-    downloads[key] = { repo, file: file.path, downloaded: 0, total: file.size };
+  async function pullGroup(repo: string, g: Group<HfFile>) {
+    const groupKey = `${repo}/${g.key}`;
+    pulling[groupKey] = true;
+    error = null;
     try {
-      await downloadModel(repo, file.path);
+      for (const m of g.members) {
+        const key = `${repo}/${m.path}`;
+        downloads[key] = { repo, file: m.path, downloaded: 0, total: m.size };
+        try {
+          await downloadModel(repo, m.path);
+        } catch (e) {
+          if (String(e).includes("cancelled")) {
+            return;
+          }
+          throw e;
+        } finally {
+          delete downloads[key];
+          downloads = { ...downloads };
+        }
+      }
     } catch (e) {
-      if (!String(e).includes("cancelled")) error = String(e);
+      error = String(e);
     } finally {
-      delete downloads[key];
-      downloads = { ...downloads };
+      delete pulling[groupKey];
+      pulling = { ...pulling };
     }
   }
 
-  async function cancel(repo: string, file: string, e: MouseEvent) {
+  async function cancelGroup(repo: string, g: Group<HfFile>, e: MouseEvent) {
     e.stopPropagation();
-    await cancelDownload(repo, file).catch(() => {});
+    for (const m of g.members) {
+      await cancelDownload(repo, m.path).catch(() => {});
+    }
+  }
+
+  function groupProgress(repo: string, g: Group<HfFile>): { done: number; total: number } {
+    let done = 0;
+    const total = g.totalSize;
+    for (const m of g.members) {
+      const key = `${repo}/${m.path}`;
+      const p = downloads[key];
+      if (p) done += p.downloaded;
+    }
+    return { done, total };
   }
 
   function shortRepo(id: string): { org: string; name: string } {
@@ -234,43 +265,47 @@
             {:else if files[m.id].length === 0}
               <div class="row hint">no gguf files</div>
             {:else}
-              {#each files[m.id] as f}
-                {@const key = `${m.id}/${f.path}`}
-                {@const p = downloads[key]}
-                {@const v = fitVerdict(f.size, app.system?.ram_gb)}
-                {@const q = parseQuant(f.path)}
-                <div class="file-row" class:downloading={!!p}>
+              {#each files[m.id] as g}
+                {@const groupKey = `${m.id}/${g.key}`}
+                {@const active = !!pulling[groupKey]}
+                {@const v = fitVerdict(g.totalSize, app.system?.ram_gb)}
+                {@const q = parseQuant(g.rep.path)}
+                {@const prog = groupProgress(m.id, g)}
+                <div class="file-row" class:downloading={active}>
                   <button
                     class="file-main"
-                    disabled={!!p}
-                    onclick={() => pull(m.id, f)}
+                    disabled={active}
+                    onclick={() => pullGroup(m.id, g)}
                     title={q?.hint ?? ""}
                   >
-                    <span class="file">{f.path}</span>
+                    <span class="file">{shardBaseName(g.rep.path)}</span>
+                    {#if g.shardCount > 1}
+                      <span class="shards">{g.shardCount} parts</span>
+                    {/if}
                     {#if q}
                       <span class="quant quant-{quantTier(q)}" title={q.hint}>
                         {q.code}
                       </span>
                     {/if}
-                    <span class="size">{formatBytes(f.size)}</span>
+                    <span class="size">{formatBytes(g.totalSize)}</span>
                     <span class="fit fit-{v}">{fitLabel(v)}</span>
                   </button>
-                  {#if p}
+                  {#if active}
                     <div class="dl">
                       <div class="dl-bar">
                         <div
                           class="dl-fill"
-                          style="width: {p.total ? (p.downloaded / p.total) * 100 : 0}%"
+                          style="width: {prog.total ? (prog.done / prog.total) * 100 : 0}%"
                         ></div>
                       </div>
                       <span class="dl-pct">
-                        {p.total
-                          ? `${Math.round((p.downloaded / p.total) * 100)}%`
-                          : formatBytes(p.downloaded)}
+                        {prog.total
+                          ? `${Math.round((prog.done / prog.total) * 100)}%`
+                          : formatBytes(prog.done)}
                       </span>
                       <button
                         class="dl-cancel"
-                        onclick={(e) => cancel(m.id, f.path, e)}
+                        onclick={(e) => cancelGroup(m.id, g, e)}
                         aria-label="Cancel download"
                       >
                         cancel
@@ -510,6 +545,15 @@
   .quant-low {
     background: var(--warn-bg);
     color: var(--warn);
+  }
+  .shards {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-mute);
+    padding: 2px 8px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r-sm);
+    flex-shrink: 0;
   }
   .dl {
     display: flex;
