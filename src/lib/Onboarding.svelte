@@ -28,92 +28,117 @@
   }
 </script>
 
-<section class="onboarding">
-  <h1>pico</h1>
-  <p class="tagline">Local AI. 5MB.</p>
-  <p class="body">
-    pico runs on top of <code>llama.cpp</code>. We don't bundle it — we use yours.
-  </p>
+<section class="page">
+  <div class="hero">
+    <h1>pico</h1>
+    <p class="tagline">Local AI. 5MB.</p>
+  </div>
 
-  {#if !installing}
-    <button onclick={install}>Install llama.cpp via Homebrew</button>
-    <p class="hint">
-      Already installed elsewhere? Make sure <code>llama-server</code> is on your PATH and relaunch.
+  <div class="card">
+    <p class="body">
+      pico runs on <code>llama.cpp</code>. It uses yours, not ours.
     </p>
-  {:else}
-    <div class="log">
-      {#each log as line}
-        <div>{line}</div>
-      {/each}
-    </div>
-  {/if}
 
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
+    {#if !installing}
+      <button onclick={install}>Install via Homebrew</button>
+      <p class="hint">
+        Already installed? Put <code>llama-server</code> on your PATH and relaunch.
+      </p>
+    {:else}
+      <div class="log">
+        {#each log as line}<div>{line}</div>{/each}
+      </div>
+    {/if}
+
+    {#if error}
+      <p class="error">{error}</p>
+    {/if}
+  </div>
 </section>
 
 <style>
-  .onboarding {
-    max-width: 520px;
-    margin: 12vh auto 0;
-    padding: 0 24px;
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    gap: 40px;
+  }
+  .hero {
     text-align: center;
   }
   h1 {
-    font-size: 48px;
+    font-size: 64px;
     font-weight: 700;
     margin: 0;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
+    line-height: 1;
   }
   .tagline {
-    font-size: 18px;
-    opacity: 0.6;
-    margin: 4px 0 32px;
+    font-size: 15px;
+    opacity: 0.5;
+    margin: 8px 0 0;
+    font-family: var(--mono);
+  }
+  .card {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
   }
   .body {
-    font-size: 15px;
-    line-height: 1.5;
-    margin-bottom: 24px;
+    font-size: 14px;
+    margin: 0;
+    text-align: center;
+    opacity: 0.8;
   }
   code {
-    background: rgba(127, 127, 127, 0.15);
+    font-family: var(--mono);
+    background: var(--surface);
     padding: 1px 6px;
     border-radius: 4px;
-    font-size: 0.92em;
+    font-size: 0.9em;
   }
   button {
-    padding: 10px 18px;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 1px solid currentColor;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--line-strong);
     background: transparent;
     color: inherit;
+    border-radius: 6px;
     cursor: pointer;
   }
   button:hover {
-    background: rgba(127, 127, 127, 0.1);
+    background: var(--surface);
   }
   .hint {
-    font-size: 13px;
-    opacity: 0.55;
-    margin-top: 18px;
+    font-size: 11px;
+    font-family: var(--mono);
+    opacity: 0.45;
+    margin: 0;
+    text-align: center;
   }
   .log {
-    margin-top: 16px;
-    text-align: left;
-    font-family: ui-monospace, Menlo, monospace;
-    font-size: 12px;
-    background: rgba(0, 0, 0, 0.04);
-    padding: 12px;
-    border-radius: 6px;
-    max-height: 280px;
+    width: 100%;
+    max-height: 320px;
     overflow-y: auto;
-    line-height: 1.4;
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--surface);
+    padding: 12px 14px;
+    border-radius: 8px;
+    line-height: 1.5;
+    white-space: pre;
   }
   .error {
-    color: #d33;
-    margin-top: 12px;
-    font-size: 13px;
+    color: #e55;
+    font-size: 12px;
+    margin: 0;
+    text-align: center;
   }
 </style>
