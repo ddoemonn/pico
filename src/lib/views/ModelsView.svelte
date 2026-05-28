@@ -94,70 +94,73 @@
   .view {
     flex: 1;
     overflow-y: auto;
-    padding: 28px 24px;
-    max-width: 760px;
+    padding: 24px 28px 48px;
+    max-width: 820px;
     width: 100%;
     margin: 0 auto;
   }
   .header {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   h1 {
-    font-size: 22px;
+    font-size: 24px;
     margin: 0;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
   .sub {
     margin: 4px 0 0;
     font-size: 12px;
-    opacity: 0.5;
+    color: var(--fg-mute);
   }
   code {
     font-family: var(--mono);
     background: var(--surface);
     padding: 1px 6px;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     font-size: 0.92em;
   }
   .empty {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 48px 0;
+    gap: 14px;
+    padding: 64px 0;
   }
   .empty button {
-    padding: 8px 16px;
-    font-family: inherit;
+    padding: 9px 18px;
     font-size: 13px;
     background: transparent;
     border: 1px solid var(--line-strong);
-    border-radius: 6px;
-    cursor: pointer;
-    color: inherit;
+    border-radius: var(--r);
+    transition: border-color var(--t), background var(--t);
   }
   .empty button:hover {
+    border-color: var(--fg-mute);
     background: var(--surface);
   }
   .hint {
     font-family: var(--mono);
     font-size: 12px;
-    opacity: 0.45;
+    color: var(--fg-mute);
     margin: 0;
   }
   .list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
   .row {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--r-lg);
+    transition: border-color var(--t), background var(--t);
+  }
+  .row:hover {
+    border-color: var(--line-strong);
   }
   .row.active {
     border-color: var(--accent);
@@ -176,39 +179,43 @@
   }
   .meta {
     display: flex;
-    gap: 12px;
-    margin-top: 2px;
+    gap: 14px;
+    margin-top: 4px;
     font-family: var(--mono);
     font-size: 11px;
-    opacity: 0.55;
+    color: var(--fg-mute);
   }
-  button {
-    padding: 6px 14px;
-    font-family: inherit;
+  .row > button {
+    padding: 7px 16px;
     font-size: 12px;
     background: transparent;
     border: 1px solid var(--line-strong);
-    color: inherit;
-    border-radius: 6px;
-    cursor: pointer;
+    border-radius: var(--r);
+    transition: border-color var(--t), background var(--t), color var(--t);
+    flex-shrink: 0;
   }
-  button:hover:not(:disabled) {
-    background: var(--surface);
+  .row > button:hover:not(:disabled) {
+    border-color: var(--fg);
+    background: var(--surface-hover);
   }
-  button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .row > button:disabled {
+    opacity: 0.45;
   }
   .badge {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--accent);
-    padding: 4px 10px;
+    padding: 5px 12px;
     border: 1px solid var(--accent);
-    border-radius: 6px;
+    border-radius: var(--r);
+    flex-shrink: 0;
   }
   .error {
-    color: #e55;
-    font-size: 13px;
+    color: var(--danger);
+    background: var(--danger-bg);
+    padding: 8px 12px;
+    border-radius: var(--r);
+    font-size: 12px;
+    margin-top: 14px;
   }
 </style>

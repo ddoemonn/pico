@@ -11,10 +11,10 @@
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
 
-  type Sort = "trending" | "downloads" | "likes" | "lastModified";
+  type Sort = "trendingScore" | "downloads" | "likes" | "lastModified";
 
   const sortOptions: { id: Sort; label: string }[] = [
-    { id: "trending", label: "trending" },
+    { id: "trendingScore", label: "trending" },
     { id: "downloads", label: "popular" },
     { id: "likes", label: "loved" },
     { id: "lastModified", label: "recent" },
@@ -32,7 +32,7 @@
   ];
 
   let query = $state("");
-  let sort = $state<Sort>("trending");
+  let sort = $state<Sort>("trendingScore");
   let activeTag = $state("all");
   let results = $state<HfModel[]>([]);
   let searching = $state(false);
@@ -137,38 +137,43 @@
 
 <section class="view">
   <div class="head">
-    <div>
+    <div class="title">
       <h1>discover</h1>
       <p class="sub">
-        Hugging Face · GGUF · {app.system?.ram_gb ?? "?"}GB RAM detected
+        Hugging Face GGUF · {app.system?.ram_gb ?? "?"}GB RAM
       </p>
     </div>
     <div class="search">
       <input
         bind:value={query}
         placeholder="search models"
+        aria-label="Search Hugging Face"
         onkeydown={(e) => e.key === "Enter" && search()}
       />
     </div>
   </div>
 
   <div class="filters">
-    <div class="sorts">
+    <div class="row-filters" role="tablist" aria-label="Sort">
       {#each sortOptions as s}
         <button
           class="chip"
           class:active={sort === s.id}
+          role="tab"
+          aria-selected={sort === s.id}
           onclick={() => selectSort(s.id)}
         >
           {s.label}
         </button>
       {/each}
     </div>
-    <div class="tags">
+    <div class="row-filters" role="tablist" aria-label="Family">
       {#each tagPresets as t}
         <button
           class="chip tag"
           class:active={activeTag === t.id}
+          role="tab"
+          aria-selected={activeTag === t.id}
           onclick={() => selectTag(t.id)}
         >
           {t.label}
@@ -178,7 +183,7 @@
   </div>
 
   {#if error}
-    <p class="error">{error}</p>
+    <div class="error" role="alert">{error}</div>
   {/if}
 
   {#if searching && results.length === 0}
@@ -251,126 +256,127 @@
   .view {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 24px 48px;
-    max-width: 880px;
+    padding: 24px 28px 48px;
+    max-width: 920px;
     width: 100%;
     margin: 0 auto;
   }
   .head {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr minmax(220px, 320px);
     align-items: end;
-    justify-content: space-between;
     gap: 24px;
-    margin-bottom: 14px;
+    margin-bottom: 20px;
+  }
+  .title {
+    min-width: 0;
   }
   h1 {
-    font-size: 22px;
+    font-size: 24px;
     margin: 0;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
   .sub {
     margin: 4px 0 0;
     font-size: 11px;
     font-family: var(--mono);
-    opacity: 0.5;
-  }
-  .search {
-    flex: 1;
-    max-width: 320px;
+    color: var(--fg-mute);
   }
   .search input {
     width: 100%;
-    padding: 8px 12px;
+    padding: 9px 12px;
     font-size: 13px;
     border: 1px solid var(--line-strong);
-    border-radius: 6px;
+    border-radius: var(--r);
     background: transparent;
-    color: inherit;
-    font-family: inherit;
+    transition: border-color var(--t), background var(--t);
   }
-  .search input:focus {
+  .search input:hover {
+    border-color: var(--fg-mute);
+  }
+  .search input:focus-visible {
     outline: none;
     border-color: var(--accent);
+    background: var(--surface);
   }
 
   .filters {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
+    gap: 8px;
+    margin-bottom: 20px;
   }
-  .sorts,
-  .tags {
+  .row-filters {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     flex-wrap: wrap;
   }
   .chip {
     background: transparent;
     border: 1px solid var(--line);
-    color: inherit;
+    color: var(--fg-dim);
     font-family: var(--mono);
     font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    cursor: pointer;
-    opacity: 0.65;
+    padding: 5px 12px;
+    border-radius: var(--r-pill);
+    transition: color var(--t), border-color var(--t), background var(--t);
   }
   .chip:hover {
-    opacity: 1;
+    color: var(--fg);
+    border-color: var(--fg-mute);
   }
   .chip.active {
-    opacity: 1;
+    color: var(--fg);
     border-color: var(--fg);
     background: var(--surface);
   }
-  .chip.tag {
-    opacity: 0.5;
-  }
   .chip.tag.active {
-    opacity: 1;
-    border-color: var(--accent);
     color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-bg);
   }
 
   .results {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
   .model {
     border: 1px solid var(--line);
-    border-radius: 8px;
-    background: transparent;
+    border-radius: var(--r-lg);
+    transition: border-color var(--t), background var(--t);
+  }
+  .model:hover {
+    border-color: var(--line-strong);
   }
   .model.open {
-    background: var(--surface);
     border-color: var(--line-strong);
+    background: var(--surface);
   }
   .card {
     width: 100%;
     text-align: left;
     background: transparent;
     border: none;
-    padding: 10px 14px;
-    cursor: pointer;
-    color: inherit;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-family: inherit;
+    gap: 6px;
+    border-radius: var(--r-lg);
   }
   .top {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    min-width: 0;
   }
   .caret {
     font-family: var(--mono);
     font-size: 10px;
-    opacity: 0.5;
+    color: var(--fg-mute);
     width: 10px;
+    flex-shrink: 0;
   }
   .name {
     flex: 1;
@@ -378,9 +384,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
   .org {
-    opacity: 0.5;
+    color: var(--fg-mute);
   }
   .rep {
     font-weight: 500;
@@ -388,49 +395,47 @@
   .pill {
     font-family: var(--mono);
     font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 4px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
     background: var(--surface-hover);
-    opacity: 0.8;
+    color: var(--fg-dim);
+    flex-shrink: 0;
   }
   .meta {
     display: flex;
-    gap: 12px;
-    padding-left: 18px;
+    gap: 14px;
+    padding-left: 20px;
     font-family: var(--mono);
     font-size: 11px;
-    opacity: 0.55;
+    color: var(--fg-mute);
     flex-wrap: wrap;
   }
   .tag-tag {
     color: var(--accent);
-    opacity: 0.9;
   }
 
   .files {
-    padding: 4px 14px 10px 32px;
+    padding: 4px 16px 12px 36px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
   }
   .file-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 7px 10px;
-    border: 1px dashed var(--line-strong);
-    border-radius: 6px;
-    background: transparent;
-    color: inherit;
-    font-family: inherit;
-    cursor: pointer;
+    gap: 12px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--bg);
+    transition: border-color var(--t), background var(--t);
   }
   .file-row:hover:not(:disabled) {
+    border-color: var(--line-strong);
     background: var(--surface-hover);
   }
   .file-row:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    opacity: 0.55;
   }
   .file {
     flex: 1;
@@ -439,33 +444,37 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
   .size {
     font-family: var(--mono);
     font-size: 11px;
-    opacity: 0.6;
+    color: var(--fg-mute);
     min-width: 64px;
     text-align: right;
+    flex-shrink: 0;
   }
   .fit {
     font-family: var(--mono);
     font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
     min-width: 64px;
     text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
   }
   .fit-fits {
     background: var(--accent-bg);
     color: var(--accent);
   }
   .fit-tight {
-    background: rgba(234, 179, 8, 0.12);
-    color: #e0a800;
+    background: var(--warn-bg);
+    color: var(--warn);
   }
   .fit-too-big {
-    background: rgba(229, 85, 85, 0.12);
-    color: #e55;
+    background: var(--danger-bg);
+    color: var(--danger);
   }
   .progress {
     font-family: var(--mono);
@@ -475,15 +484,19 @@
     text-align: right;
   }
   .hint {
-    padding: 8px 12px;
+    padding: 12px;
     font-family: var(--mono);
-    font-size: 11px;
-    opacity: 0.45;
+    font-size: 12px;
+    color: var(--fg-mute);
     margin: 0;
+    text-align: center;
   }
   .error {
-    color: #e55;
+    color: var(--danger);
+    background: var(--danger-bg);
+    padding: 8px 12px;
+    border-radius: var(--r);
     font-size: 12px;
-    margin: 0 0 12px;
+    margin: 0 0 14px;
   }
 </style>

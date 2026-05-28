@@ -57,62 +57,70 @@
   .view {
     flex: 1;
     overflow-y: auto;
-    padding: 28px 24px;
-    max-width: 760px;
+    padding: 24px 28px 48px;
+    max-width: 820px;
     width: 100%;
     margin: 0 auto;
   }
   .header {
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
   h1 {
-    font-size: 22px;
+    font-size: 24px;
     margin: 0;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
   .sub {
     margin: 4px 0 0;
     font-size: 12px;
-    opacity: 0.5;
+    color: var(--fg-mute);
+    font-family: var(--mono);
   }
   .group {
-    margin-bottom: 28px;
+    margin-bottom: 32px;
   }
   .label {
     font-family: var(--mono);
     font-size: 10px;
-    letter-spacing: 0.08em;
-    opacity: 0.45;
-    margin-bottom: 10px;
+    letter-spacing: 0.1em;
+    color: var(--fg-mute);
+    margin-bottom: 12px;
     text-transform: uppercase;
   }
   .kv {
     display: grid;
     grid-template-columns: 120px 1fr;
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--line);
     font-family: var(--mono);
     font-size: 12px;
+    gap: 16px;
   }
   .k {
-    opacity: 0.55;
+    color: var(--fg-mute);
   }
   .v {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--fg-dim);
   }
   .body {
     font-size: 13px;
-    line-height: 1.6;
-    opacity: 0.75;
+    line-height: 1.65;
+    color: var(--fg-dim);
     margin: 0;
-    max-width: 520px;
+    max-width: 560px;
   }
   .warn {
-    color: #e55;
+    color: var(--danger);
+    background: var(--danger-bg);
+    padding: 8px 12px;
+    border-radius: var(--r);
     font-family: var(--mono);
     font-size: 12px;
+    margin: 0;
+    display: inline-block;
   }
 </style>

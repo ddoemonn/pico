@@ -64,7 +64,7 @@ export function onInstallOutput(
 
 export function searchHfModels(
   query: string,
-  sort: "trending" | "downloads" | "likes" | "lastModified" = "trending",
+  sort: "trendingScore" | "downloads" | "likes" | "lastModified" = "trendingScore",
   tags: string[] = [],
 ): Promise<HfModel[]> {
   return invoke<HfModel[]>("search_hf_models", { query, sort, tags });
