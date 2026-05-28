@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { detectLlamaServer, type LlamaServerStatus } from "$lib/api";
+  import { detectLlamaServer, type LlamaServerStatus, type LocalModel } from "$lib/api";
   import Onboarding from "$lib/Onboarding.svelte";
+  import ModelBrowser from "$lib/ModelBrowser.svelte";
 
   let status = $state<LlamaServerStatus | null>(null);
   let loading = $state(true);
+  let activeModel = $state<LocalModel | null>(null);
 
   async function refresh() {
     loading = true;
@@ -18,15 +20,21 @@
   <div class="loading">…</div>
 {:else if !status?.installed}
   <Onboarding onInstalled={refresh} />
+{:else if !activeModel}
+  <header class="topbar">
+    <span class="brand">pico</span>
+    <span class="status">llama.cpp ready</span>
+  </header>
+  <ModelBrowser onModelReady={(m) => (activeModel = m)} />
 {:else}
+  <header class="topbar">
+    <span class="brand">pico</span>
+    <button class="back" onclick={() => (activeModel = null)}>← Models</button>
+  </header>
   <main class="ready">
-    <h1>pico</h1>
-    <p class="ok">llama.cpp detected</p>
-    <p class="path">{status.path}</p>
-    {#if status.version}
-      <p class="version">{status.version}</p>
-    {/if}
-    <p class="next">Model browser coming next.</p>
+    <h2>{activeModel.file}</h2>
+    <p class="path">{activeModel.path}</p>
+    <p class="next">Chat coming next.</p>
   </main>
 {/if}
 
@@ -55,29 +63,44 @@
     opacity: 0.4;
     font-size: 24px;
   }
-  .ready {
-    max-width: 520px;
-    margin: 12vh auto 0;
-    padding: 0 24px;
-    text-align: center;
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.15);
   }
-  h1 {
-    font-size: 48px;
+  .brand {
     font-weight: 700;
-    margin: 0;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
-  .ok {
-    color: #2a8;
-    font-size: 16px;
-    margin: 12px 0 4px;
+  .status {
+    font-size: 12px;
+    opacity: 0.5;
   }
-  .path,
-  .version {
+  .back {
+    font-size: 12px;
+    background: transparent;
+    border: 1px solid rgba(127, 127, 127, 0.3);
+    color: inherit;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ready {
+    max-width: 720px;
+    margin: 48px auto 0;
+    padding: 0 24px;
+  }
+  h2 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .path {
     font-family: ui-monospace, Menlo, monospace;
     font-size: 12px;
-    opacity: 0.6;
-    margin: 2px 0;
+    opacity: 0.55;
   }
   .next {
     margin-top: 32px;
