@@ -71,6 +71,41 @@ export function onDownloadProgress(
   return listen<DownloadProgress>("download:progress", (e) => cb(e.payload));
 }
 
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+export type ChatMetrics = {
+  ttft_ms: number;
+  tokens: number;
+  tok_per_s: number;
+};
+
+export function startInference(modelPath: string, ctxSize: number): Promise<number> {
+  return invoke<number>("start_inference", { modelPath, ctxSize });
+}
+
+export function stopInference(): Promise<void> {
+  return invoke<void>("stop_inference");
+}
+
+export function chatStream(
+  messages: ChatMessage[],
+  temperature: number,
+  topP: number,
+): Promise<ChatMetrics> {
+  return invoke<ChatMetrics>("chat_stream", {
+    messages,
+    temperature,
+    topP,
+  });
+}
+
+export function onChatToken(cb: (delta: string) => void): Promise<UnlistenFn> {
+  return listen<{ delta: string }>("chat:token", (e) => cb(e.payload.delta));
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`;

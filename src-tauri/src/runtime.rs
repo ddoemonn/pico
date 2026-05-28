@@ -1,7 +1,10 @@
 use serde::Serialize;
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use tauri::{AppHandle, Emitter};
+use std::net::TcpListener;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, State};
 
 const CANDIDATE_PATHS: &[&str] = &[
     "/opt/homebrew/bin/llama-server",
@@ -96,3 +99,105 @@ pub async fn install_llama_cpp(app: AppHandle) -> Result<(), String> {
 
     Ok(())
 }
+
+#[derive(Default)]
+pub struct InferenceState {
+    pub child: Mutex<Option<Child>>,
+    pub port: Mutex<Option<u16>>,
+}
+
+fn pick_free_port() -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    drop(listener);
+    Ok(port)
+}
+
+async fn wait_for_ready(port: u16) -> Result<(), String> {
+    let url = format!("http://127.0.0.1:{port}/health");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let client = reqwest::Client::new();
+    while Instant::now() < deadline {
+        if let Ok(resp) = client.get(&url).send().await {
+            if resp.status().is_success() {
+                return Ok(());
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    Err("llama-server did not become ready in 60s".into())
+}
+
+fn kill_running(state: &InferenceState) {
+    let mut guard = state.child.lock().unwrap();
+    if let Some(mut child) = guard.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    *state.port.lock().unwrap() = None;
+}
+
+#[tauri::command]
+pub async fn start_inference(
+    state: State<'_, InferenceState>,
+    model_path: PathBuf,
+    ctx_size: u32,
+) -> Result<u16, String> {
+    kill_running(&state);
+
+    let server = which::which("llama-server")
+        .ok()
+        .or_else(|| {
+            CANDIDATE_PATHS
+                .iter()
+                .map(PathBuf::from)
+                .find(|p| p.exists())
+        })
+        .ok_or_else(|| "llama-server not found".to_string())?;
+
+    let port = pick_free_port()?;
+    let child = spawn_server(&server, &model_path, ctx_size, port)?;
+
+    *state.child.lock().unwrap() = Some(child);
+    *state.port.lock().unwrap() = Some(port);
+
+    wait_for_ready(port).await?;
+    Ok(port)
+}
+
+fn spawn_server(
+    server: &Path,
+    model: &Path,
+    ctx: u32,
+    port: u16,
+) -> Result<Child, String> {
+    Command::new(server)
+        .args([
+            "-m",
+            &model.to_string_lossy(),
+            "-c",
+            &ctx.to_string(),
+            "--port",
+            &port.to_string(),
+            "--host",
+            "127.0.0.1",
+            "-ngl",
+            "999",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("failed to spawn llama-server: {e}"))
+}
+
+#[tauri::command]
+pub fn stop_inference(state: State<'_, InferenceState>) -> Result<(), String> {
+    kill_running(&state);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn current_port(state: State<'_, InferenceState>) -> Option<u16> {
+    *state.port.lock().unwrap()
+}
+

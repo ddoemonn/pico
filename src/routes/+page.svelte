@@ -2,6 +2,7 @@
   import { detectLlamaServer, type LlamaServerStatus, type LocalModel } from "$lib/api";
   import Onboarding from "$lib/Onboarding.svelte";
   import ModelBrowser from "$lib/ModelBrowser.svelte";
+  import Chat from "$lib/Chat.svelte";
 
   let status = $state<LlamaServerStatus | null>(null);
   let loading = $state(true);
@@ -27,15 +28,7 @@
   </header>
   <ModelBrowser onModelReady={(m) => (activeModel = m)} />
 {:else}
-  <header class="topbar">
-    <span class="brand">pico</span>
-    <button class="back" onclick={() => (activeModel = null)}>← Models</button>
-  </header>
-  <main class="ready">
-    <h2>{activeModel.file}</h2>
-    <p class="path">{activeModel.path}</p>
-    <p class="next">Chat coming next.</p>
-  </main>
+  <Chat model={activeModel} onUnload={() => (activeModel = null)} />
 {/if}
 
 <style>
@@ -77,34 +70,5 @@
   .status {
     font-size: 12px;
     opacity: 0.5;
-  }
-  .back {
-    font-size: 12px;
-    background: transparent;
-    border: 1px solid rgba(127, 127, 127, 0.3);
-    color: inherit;
-    border-radius: 6px;
-    padding: 4px 10px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .ready {
-    max-width: 720px;
-    margin: 48px auto 0;
-    padding: 0 24px;
-  }
-  h2 {
-    font-size: 18px;
-    margin: 0 0 4px;
-  }
-  .path {
-    font-family: ui-monospace, Menlo, monospace;
-    font-size: 12px;
-    opacity: 0.55;
-  }
-  .next {
-    margin-top: 32px;
-    opacity: 0.5;
-    font-size: 13px;
   }
 </style>
