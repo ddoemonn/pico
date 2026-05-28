@@ -16,6 +16,7 @@
     shardInfo,
     type Group,
   } from "../shard";
+  import { downloads } from "../downloads.svelte";
 
   let local = $state<LocalModel[]>([]);
   let groups = $state<Group<LocalModel>[]>([]);
@@ -31,7 +32,10 @@
     if (l.percent !== null) percent = l.percent;
   });
 
-  refresh();
+  $effect(() => {
+    downloads.completedAt;
+    refresh();
+  });
 
   async function refresh() {
     loading = true;

@@ -8,8 +8,11 @@
   import SettingsView from "$lib/views/SettingsView.svelte";
   import { app } from "$lib/state.svelte";
   import { theme } from "$lib/theme.svelte";
+  import { downloads } from "$lib/downloads.svelte";
+  import DownloadTray from "$lib/DownloadTray.svelte";
 
   theme.init();
+  downloads.init();
 
   let status = $state<LlamaServerStatus | null>(null);
   let loading = $state(true);
@@ -39,6 +42,7 @@
       <SettingsView />
     {/if}
   </Shell>
+  <DownloadTray />
 {/if}
 
 <style>

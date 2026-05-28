@@ -1,16 +1,13 @@
 <script lang="ts">
   import {
-    cancelDownload,
-    downloadModel,
     formatBytes,
     listHfFiles,
-    onDownloadProgress,
     searchHfModels,
-    type DownloadProgress,
     type HfFile,
     type HfModel,
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
+  import { downloads } from "../downloads.svelte";
   import { parseQuant, quantTier } from "../quant";
   import {
     groupShards,
@@ -47,13 +44,7 @@
   let searching = $state(false);
   let expanded = $state<string | null>(null);
   let files = $state<Record<string, Group<HfFile>[]>>({});
-  let downloads = $state<Record<string, DownloadProgress>>({});
-  let pulling = $state<Record<string, boolean>>({});
   let error = $state<string | null>(null);
-
-  onDownloadProgress((p) => {
-    downloads[`${p.repo}/${p.file}`] = p;
-  });
 
   search();
 
@@ -106,49 +97,24 @@
   }
 
   async function pullGroup(repo: string, g: Group<HfFile>) {
-    const groupKey = `${repo}/${g.key}`;
-    pulling[groupKey] = true;
     error = null;
     try {
       for (const m of g.members) {
-        const key = `${repo}/${m.path}`;
-        downloads[key] = { repo, file: m.path, downloaded: 0, total: m.size };
         try {
-          await downloadModel(repo, m.path);
+          await downloads.pull(repo, m.path, m.size, g.key);
         } catch (e) {
-          if (String(e).includes("cancelled")) {
-            return;
-          }
+          if (String(e).includes("cancelled")) return;
           throw e;
-        } finally {
-          delete downloads[key];
-          downloads = { ...downloads };
         }
       }
     } catch (e) {
       error = String(e);
-    } finally {
-      delete pulling[groupKey];
-      pulling = { ...pulling };
     }
   }
 
-  async function cancelGroup(repo: string, g: Group<HfFile>, e: MouseEvent) {
+  function cancelGroupClick(repo: string, g: Group<HfFile>, e: MouseEvent) {
     e.stopPropagation();
-    for (const m of g.members) {
-      await cancelDownload(repo, m.path).catch(() => {});
-    }
-  }
-
-  function groupProgress(repo: string, g: Group<HfFile>): { done: number; total: number } {
-    let done = 0;
-    const total = g.totalSize;
-    for (const m of g.members) {
-      const key = `${repo}/${m.path}`;
-      const p = downloads[key];
-      if (p) done += p.downloaded;
-    }
-    return { done, total };
+    downloads.cancelGroup(repo, g.key);
   }
 
   function shortRepo(id: string): { org: string; name: string } {
@@ -272,11 +238,10 @@
               <div class="row hint">no gguf files</div>
             {:else}
               {#each files[m.id] as g}
-                {@const groupKey = `${m.id}/${g.key}`}
-                {@const active = !!pulling[groupKey]}
+                {@const active = downloads.hasActive(m.id, g.key)}
                 {@const v = fitVerdict(g.totalSize, app.system?.ram_gb)}
                 {@const q = parseQuant(g.rep.path)}
-                {@const prog = groupProgress(m.id, g)}
+                {@const prog = downloads.groupProgress(m.id, g.key)}
                 <div class="file-row" class:downloading={active}>
                   <button
                     class="file-main"
@@ -311,7 +276,7 @@
                       </span>
                       <button
                         class="dl-cancel"
-                        onclick={(e) => cancelGroup(m.id, g, e)}
+                        onclick={(e) => cancelGroupClick(m.id, g, e)}
                         aria-label="Cancel download"
                       >
                         cancel
