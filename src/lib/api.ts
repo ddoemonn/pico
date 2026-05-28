@@ -78,6 +78,10 @@ export function downloadModel(repo: string, file: string): Promise<string> {
   return invoke<string>("download_model", { repo, file });
 }
 
+export function cancelDownload(repo: string, file: string): Promise<void> {
+  return invoke<void>("cancel_download", { repo, file });
+}
+
 export function listLocalModels(): Promise<LocalModel[]> {
   return invoke<LocalModel[]>("list_local_models");
 }

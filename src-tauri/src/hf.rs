@@ -1,10 +1,22 @@
 use crate::paths;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+
+#[derive(Default)]
+pub struct DownloadState {
+    cancels: Mutex<HashMap<String, Arc<AtomicBool>>>,
+}
+
+fn dl_key(repo: &str, file: &str) -> String {
+    format!("{repo}/{file}")
+}
 
 const HF_BASE: &str = "https://huggingface.co";
 
@@ -88,6 +100,31 @@ pub async fn search_hf_models(
     resp.json::<Vec<HfModel>>().await.map_err(|e| e.to_string())
 }
 
+fn is_llm_file(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    let base = lower.rsplit('/').next().unwrap_or(&lower);
+
+    if !base.ends_with(".gguf") {
+        return false;
+    }
+    if base.starts_with("mmproj") || base.contains(".mmproj") {
+        return false;
+    }
+    if base.starts_with("tokenizer") {
+        return false;
+    }
+    if base.contains("embed") || base.contains("embedding") {
+        return false;
+    }
+    if base.contains("rerank") {
+        return false;
+    }
+    if base.contains("draft") {
+        return false;
+    }
+    true
+}
+
 #[tauri::command]
 pub async fn list_hf_files(repo: String) -> Result<Vec<HfFile>, String> {
     let url = format!("{HF_BASE}/api/models/{repo}/tree/main?recursive=true");
@@ -98,7 +135,7 @@ pub async fn list_hf_files(repo: String) -> Result<Vec<HfFile>, String> {
     let entries: Vec<HfTreeEntry> = resp.json().await.map_err(|e| e.to_string())?;
     Ok(entries
         .into_iter()
-        .filter(|e| e.kind == "file" && e.path.to_lowercase().ends_with(".gguf"))
+        .filter(|e| e.kind == "file" && is_llm_file(&e.path))
         .map(|e| HfFile {
             path: e.path,
             size: e.size,
@@ -117,6 +154,30 @@ pub async fn download_model(
         fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
     }
 
+    let key = dl_key(&repo, &file);
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let state: State<'_, DownloadState> = app.state();
+        state.cancels.lock().unwrap().insert(key.clone(), cancel.clone());
+    }
+
+    let result = stream_to_disk(&app, &repo, &file, &dest, cancel).await;
+
+    {
+        let state: State<'_, DownloadState> = app.state();
+        state.cancels.lock().unwrap().remove(&key);
+    }
+
+    result
+}
+
+async fn stream_to_disk(
+    app: &AppHandle,
+    repo: &str,
+    file: &str,
+    dest: &PathBuf,
+    cancel: Arc<AtomicBool>,
+) -> Result<PathBuf, String> {
     let url = format!("{HF_BASE}/{repo}/resolve/main/{file}");
     let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
@@ -131,6 +192,11 @@ pub async fn download_model(
     let mut last_emit = 0u64;
 
     while let Some(chunk) = stream.next().await {
+        if cancel.load(Ordering::Relaxed) {
+            drop(writer);
+            let _ = fs::remove_file(&tmp).await;
+            return Err("cancelled".into());
+        }
         let bytes = chunk.map_err(|e| e.to_string())?;
         writer.write_all(&bytes).await.map_err(|e| e.to_string())?;
         downloaded += bytes.len() as u64;
@@ -139,8 +205,8 @@ pub async fn download_model(
             let _ = app.emit(
                 "download:progress",
                 DownloadProgress {
-                    repo: repo.clone(),
-                    file: file.clone(),
+                    repo: repo.to_string(),
+                    file: file.to_string(),
                     downloaded,
                     total,
                 },
@@ -151,9 +217,29 @@ pub async fn download_model(
 
     writer.flush().await.map_err(|e| e.to_string())?;
     drop(writer);
-    fs::rename(&tmp, &dest).await.map_err(|e| e.to_string())?;
+    fs::rename(&tmp, dest).await.map_err(|e| e.to_string())?;
 
-    Ok(dest)
+    Ok(dest.clone())
+}
+
+#[tauri::command]
+pub fn cancel_download(
+    state: State<'_, DownloadState>,
+    repo: String,
+    file: String,
+) -> Result<(), String> {
+    let key = dl_key(&repo, &file);
+    if let Some(flag) = state.cancels.lock().unwrap().get(&key) {
+        flag.store(true, Ordering::Relaxed);
+        Ok(())
+    } else {
+        Err("no such download".into())
+    }
+}
+
+#[tauri::command]
+pub fn active_downloads(state: State<'_, DownloadState>) -> Vec<String> {
+    state.cancels.lock().unwrap().keys().cloned().collect()
 }
 
 #[tauri::command]

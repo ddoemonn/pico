@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    cancelDownload,
     downloadModel,
     formatBytes,
     listHfFiles,
@@ -10,6 +11,7 @@
     type HfModel,
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
+  import { parseQuant, quantStars } from "../quant";
 
   type Sort = "trendingScore" | "downloads" | "likes" | "lastModified";
 
@@ -80,7 +82,14 @@
     expanded = repo;
     if (!files[repo]) {
       try {
-        files[repo] = await listHfFiles(repo);
+        const list = await listHfFiles(repo);
+        list.sort((a, b) => {
+          const qa = parseQuant(a.path)?.quality ?? 0;
+          const qb = parseQuant(b.path)?.quality ?? 0;
+          if (qa !== qb) return qb - qa;
+          return a.size - b.size;
+        });
+        files[repo] = list;
       } catch (e) {
         error = String(e);
       }
@@ -93,11 +102,16 @@
     try {
       await downloadModel(repo, file.path);
     } catch (e) {
-      error = String(e);
+      if (!String(e).includes("cancelled")) error = String(e);
     } finally {
       delete downloads[key];
       downloads = { ...downloads };
     }
+  }
+
+  async function cancel(repo: string, file: string, e: MouseEvent) {
+    e.stopPropagation();
+    await cancelDownload(repo, file).catch(() => {});
   }
 
   function shortRepo(id: string): { org: string; name: string } {
@@ -224,22 +238,46 @@
                 {@const key = `${m.id}/${f.path}`}
                 {@const p = downloads[key]}
                 {@const v = fitVerdict(f.size, app.system?.ram_gb)}
-                <button
-                  class="row file-row"
-                  disabled={!!p}
-                  onclick={() => pull(m.id, f)}
-                >
-                  <span class="file">{f.path}</span>
-                  <span class="size">{formatBytes(f.size)}</span>
-                  <span class="fit fit-{v}">{fitLabel(v)}</span>
+                {@const q = parseQuant(f.path)}
+                <div class="file-row" class:downloading={!!p}>
+                  <button
+                    class="file-main"
+                    disabled={!!p}
+                    onclick={() => pull(m.id, f)}
+                    title={q?.hint ?? ""}
+                  >
+                    <span class="file">{f.path}</span>
+                    {#if q}
+                      <span class="quant" title="{q.code} · {q.hint}">
+                        <span class="stars">{quantStars(q)}</span>
+                      </span>
+                    {/if}
+                    <span class="size">{formatBytes(f.size)}</span>
+                    <span class="fit fit-{v}">{fitLabel(v)}</span>
+                  </button>
                   {#if p}
-                    <span class="progress">
-                      {p.total
-                        ? `${Math.round((p.downloaded / p.total) * 100)}%`
-                        : formatBytes(p.downloaded)}
-                    </span>
+                    <div class="dl">
+                      <div class="dl-bar">
+                        <div
+                          class="dl-fill"
+                          style="width: {p.total ? (p.downloaded / p.total) * 100 : 0}%"
+                        ></div>
+                      </div>
+                      <span class="dl-pct">
+                        {p.total
+                          ? `${Math.round((p.downloaded / p.total) * 100)}%`
+                          : formatBytes(p.downloaded)}
+                      </span>
+                      <button
+                        class="dl-cancel"
+                        onclick={(e) => cancel(m.id, f.path, e)}
+                        aria-label="Cancel download"
+                      >
+                        cancel
+                      </button>
+                    </div>
                   {/if}
-                </button>
+                </div>
               {/each}
             {/if}
           </div>
@@ -422,20 +460,86 @@
   }
   .file-row {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 9px 12px;
+    flex-direction: column;
     border: 1px solid var(--line);
     border-radius: var(--r);
     background: var(--bg);
     transition: border-color var(--t), background var(--t);
+    overflow: hidden;
   }
-  .file-row:hover:not(:disabled) {
+  .file-row:hover {
     border-color: var(--line-strong);
+  }
+  .file-row.downloading {
+    border-color: var(--accent);
+  }
+  .file-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+  }
+  .file-main:hover:not(:disabled) {
     background: var(--surface-hover);
   }
-  .file-row:disabled {
-    opacity: 0.55;
+  .file-main:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+  .quant {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    flex-shrink: 0;
+    min-width: 40px;
+  }
+  .stars {
+    letter-spacing: 1px;
+  }
+  .dl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--accent-bg);
+    border-top: 1px solid var(--line);
+  }
+  .dl-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--surface);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .dl-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 200ms ease;
+  }
+  .dl-pct {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 44px;
+    text-align: right;
+  }
+  .dl-cancel {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    padding: 3px 10px;
+    border-radius: var(--r-sm);
+    transition: color var(--t), border-color var(--t);
+  }
+  .dl-cancel:hover {
+    color: var(--danger);
+    border-color: var(--danger);
   }
   .file {
     flex: 1;
