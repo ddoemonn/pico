@@ -3,6 +3,7 @@
   import {
     formatBytes,
     listLocalModels,
+    onLoadLine,
     startInference,
     stopInference,
     type LocalModel,
@@ -12,6 +13,14 @@
   let loading = $state(true);
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
+  let stage = $state<string>("");
+  let percent = $state<number | null>(null);
+
+  onLoadLine((l) => {
+    if (!busy) return;
+    stage = l.line;
+    if (l.percent !== null) percent = l.percent;
+  });
 
   refresh();
 
@@ -28,6 +37,8 @@
 
   async function load(m: LocalModel) {
     busy = m.path;
+    stage = "spawning…";
+    percent = null;
     error = null;
     app.modelLoading = true;
     try {
@@ -40,8 +51,14 @@
       error = String(e);
     } finally {
       busy = null;
+      stage = "";
+      percent = null;
       app.modelLoading = false;
     }
+  }
+
+  function isMmproj(file: string): boolean {
+    return file.toLowerCase().startsWith("mmproj");
   }
 </script>
 
@@ -62,16 +79,37 @@
     <div class="list">
       {#each local as m}
         {@const active = app.activeModel?.path === m.path}
+        {@const mmproj = isMmproj(m.file)}
         <div class="row" class:active>
           <div class="info">
             <div class="file">{m.file}</div>
             <div class="meta">
               <span class="repo">{m.repo}</span>
               <span class="size">{formatBytes(m.size)}</span>
+              {#if mmproj}
+                <span class="tag-warn">vision projector</span>
+              {/if}
             </div>
+            {#if busy === m.path}
+              <div class="progress">
+                {#if percent !== null}
+                  <div class="bar"><div class="fill" style="width: {percent}%"></div></div>
+                  <div class="stage">
+                    <span class="pct">{percent}%</span>
+                    <span class="line">{stage}</span>
+                  </div>
+                {:else}
+                  <div class="stage">
+                    <span class="line">{stage || "starting…"}</span>
+                  </div>
+                {/if}
+              </div>
+            {/if}
           </div>
           {#if active}
             <span class="badge">loaded</span>
+          {:else if mmproj}
+            <span class="badge-mute" title="vision projector, not a model">skip</span>
           {:else}
             <button
               disabled={!!busy}
@@ -217,5 +255,54 @@
     border-radius: var(--r);
     font-size: 12px;
     margin-top: 14px;
+  }
+  .tag-warn {
+    color: var(--warn);
+    background: var(--warn-bg);
+    padding: 1px 8px;
+    border-radius: var(--r-sm);
+    font-size: 10px;
+  }
+  .badge-mute {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    padding: 5px 12px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r);
+    flex-shrink: 0;
+  }
+  .progress {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .bar {
+    height: 3px;
+    background: var(--surface);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 200ms ease;
+  }
+  .stage {
+    display: flex;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-mute);
+  }
+  .pct {
+    color: var(--accent);
+    min-width: 36px;
+  }
+  .line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

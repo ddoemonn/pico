@@ -123,6 +123,12 @@ export function onChatToken(cb: (delta: string) => void): Promise<UnlistenFn> {
   return listen<{ delta: string }>("chat:token", (e) => cb(e.payload.delta));
 }
 
+export type LoadLine = { line: string; percent: number | null };
+
+export function onLoadLine(cb: (l: LoadLine) => void): Promise<UnlistenFn> {
+  return listen<LoadLine>("load:line", (e) => cb(e.payload));
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`;

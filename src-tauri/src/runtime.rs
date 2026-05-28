@@ -115,7 +115,7 @@ fn pick_free_port() -> Result<u16, String> {
 
 async fn wait_for_ready(port: u16) -> Result<(), String> {
     let url = format!("http://127.0.0.1:{port}/health");
-    let deadline = Instant::now() + Duration::from_secs(60);
+    let deadline = Instant::now() + Duration::from_secs(300);
     let client = reqwest::Client::new();
     while Instant::now() < deadline {
         if let Ok(resp) = client.get(&url).send().await {
@@ -123,9 +123,9 @@ async fn wait_for_ready(port: u16) -> Result<(), String> {
                 return Ok(());
             }
         }
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
-    Err("llama-server did not become ready in 60s".into())
+    Err("llama-server did not become ready in 5 minutes".into())
 }
 
 fn kill_running(state: &InferenceState) {
@@ -139,10 +139,24 @@ fn kill_running(state: &InferenceState) {
 
 #[tauri::command]
 pub async fn start_inference(
+    app: AppHandle,
     state: State<'_, InferenceState>,
     model_path: PathBuf,
     ctx_size: u32,
 ) -> Result<u16, String> {
+    let fname = model_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if fname.starts_with("mmproj") {
+        return Err(
+            "This is a vision projector (mmproj) file, not the model itself. \
+             Download the main .gguf weight file from the same repo."
+                .into(),
+        );
+    }
+
     kill_running(&state);
 
     let server = which::which("llama-server")
@@ -156,22 +170,26 @@ pub async fn start_inference(
         .ok_or_else(|| "llama-server not found".to_string())?;
 
     let port = pick_free_port()?;
-    let child = spawn_server(&server, &model_path, ctx_size, port)?;
+    let child = spawn_server(&app, &server, &model_path, ctx_size, port)?;
 
     *state.child.lock().unwrap() = Some(child);
     *state.port.lock().unwrap() = Some(port);
 
     wait_for_ready(port).await?;
+    let _ = app.emit("load:ready", port);
     Ok(port)
 }
 
 fn spawn_server(
+    app: &AppHandle,
     server: &Path,
     model: &Path,
     ctx: u32,
     port: u16,
 ) -> Result<Child, String> {
-    Command::new(server)
+    use std::io::{BufRead, BufReader};
+
+    let mut child = Command::new(server)
         .args([
             "-m",
             &model.to_string_lossy(),
@@ -184,10 +202,70 @@ fn spawn_server(
             "-ngl",
             "999",
         ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("failed to spawn llama-server: {e}"))
+        .map_err(|e| format!("failed to spawn llama-server: {e}"))?;
+
+    if let Some(out) = child.stdout.take() {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(out).lines().map_while(Result::ok) {
+                emit_load_line(&app, &line);
+            }
+        });
+    }
+    if let Some(err) = child.stderr.take() {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(err).lines().map_while(Result::ok) {
+                emit_load_line(&app, &line);
+            }
+        });
+    }
+
+    Ok(child)
+}
+
+#[derive(serde::Serialize, Clone)]
+struct LoadLine {
+    line: String,
+    percent: Option<u32>,
+}
+
+fn emit_load_line(app: &AppHandle, raw: &str) {
+    let line = raw.trim().to_string();
+    if line.is_empty() {
+        return;
+    }
+    let percent = parse_percent(&line);
+    let _ = app.emit("load:line", LoadLine { line, percent });
+}
+
+fn parse_percent(s: &str) -> Option<u32> {
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if c.is_ascii_digit() {
+            let start = i;
+            let mut end = i + 1;
+            while let Some(&(j, nc)) = chars.peek() {
+                if nc.is_ascii_digit() {
+                    end = j + 1;
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            if s[end..].starts_with('%') {
+                if let Ok(n) = s[start..end].parse::<u32>() {
+                    if n <= 100 {
+                        return Some(n);
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 #[tauri::command]
