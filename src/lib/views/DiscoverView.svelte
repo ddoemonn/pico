@@ -12,7 +12,13 @@
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
   import { parseQuant, quantTier } from "../quant";
-  import { groupShards, shardInfo, shardBaseName, type Group } from "../shard";
+  import {
+    groupShards,
+    hfFileName,
+    hfFileSize,
+    shardBaseName,
+    type Group,
+  } from "../shard";
 
   type Sort = "trendingScore" | "downloads" | "likes" | "lastModified";
 
@@ -85,7 +91,7 @@
     if (!files[repo]) {
       try {
         const list = await listHfFiles(repo);
-        const grouped = groupShards(list);
+        const grouped = groupShards(list, hfFileName, hfFileSize);
         grouped.sort((a, b) => {
           const qa = parseQuant(a.rep.path)?.quality ?? 0;
           const qb = parseQuant(b.rep.path)?.quality ?? 0;

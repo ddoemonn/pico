@@ -28,12 +28,20 @@ export type Group<T> = {
   shardCount: number;
 };
 
-export function groupShards<T extends { path?: string; file: string; size: number }>(
+export const hfFileName = (f: { path: string }) => f.path;
+export const hfFileSize = (f: { size: number }) => f.size;
+export const localFileName = (m: { file: string }) => m.file;
+export const localFileSize = (m: { size: number }) => m.size;
+
+export function groupShards<T>(
   items: T[],
+  getName: (t: T) => string,
+  getSize: (t: T) => number,
 ): Group<T>[] {
   const map = new Map<string, T[]>();
   for (const it of items) {
-    const key = shardKey(it.file);
+    const name = getName(it);
+    const key = shardKey(name);
     const arr = map.get(key) ?? [];
     arr.push(it);
     map.set(key, arr);
@@ -41,15 +49,15 @@ export function groupShards<T extends { path?: string; file: string; size: numbe
   const groups: Group<T>[] = [];
   for (const [key, members] of map) {
     members.sort((a, b) => {
-      const ai = shardInfo(a.file)?.index ?? 0;
-      const bi = shardInfo(b.file)?.index ?? 0;
+      const ai = shardInfo(getName(a))?.index ?? 0;
+      const bi = shardInfo(getName(b))?.index ?? 0;
       return ai - bi;
     });
     groups.push({
       key,
       rep: members[0],
       members,
-      totalSize: members.reduce((s, m) => s + m.size, 0),
+      totalSize: members.reduce((s, m) => s + getSize(m), 0),
       shardCount: members.length,
     });
   }

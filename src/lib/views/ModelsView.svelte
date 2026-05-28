@@ -8,7 +8,14 @@
     stopInference,
     type LocalModel,
   } from "../api";
-  import { groupShards, shardBaseName, shardInfo, type Group } from "../shard";
+  import {
+    groupShards,
+    localFileName,
+    localFileSize,
+    shardBaseName,
+    shardInfo,
+    type Group,
+  } from "../shard";
 
   let local = $state<LocalModel[]>([]);
   let groups = $state<Group<LocalModel>[]>([]);
@@ -30,7 +37,7 @@
     loading = true;
     try {
       local = await listLocalModels();
-      groups = groupShards(local);
+      groups = groupShards(local, localFileName, localFileSize);
       groups.sort((a, b) => b.totalSize - a.totalSize);
     } catch (e) {
       error = String(e);
