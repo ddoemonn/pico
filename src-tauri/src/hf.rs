@@ -15,6 +15,12 @@ pub struct HfModel {
     pub downloads: u64,
     #[serde(default)]
     pub likes: u64,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default, rename = "lastModified")]
+    pub last_modified: Option<String>,
+    #[serde(default, rename = "pipeline_tag")]
+    pub pipeline_tag: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -50,11 +56,31 @@ pub struct LocalModel {
 }
 
 #[tauri::command]
-pub async fn search_hf_models(query: String) -> Result<Vec<HfModel>, String> {
-    let url = format!(
-        "{HF_BASE}/api/models?search={}&filter=gguf&sort=downloads&limit=30",
-        urlencoding(&query)
-    );
+pub async fn search_hf_models(
+    query: String,
+    sort: Option<String>,
+    tags: Vec<String>,
+) -> Result<Vec<HfModel>, String> {
+    let sort = sort.unwrap_or_else(|| "trending".to_string());
+    let mut params = vec![
+        ("filter".to_string(), "gguf".to_string()),
+        ("sort".to_string(), sort),
+        ("direction".to_string(), "-1".to_string()),
+        ("limit".to_string(), "40".to_string()),
+        ("full".to_string(), "true".to_string()),
+    ];
+    if !query.trim().is_empty() {
+        params.push(("search".to_string(), query));
+    }
+    for t in tags {
+        params.push(("filter".to_string(), t));
+    }
+    let qs: Vec<String> = params
+        .into_iter()
+        .map(|(k, v)| format!("{}={}", k, urlencoding(&v)))
+        .collect();
+    let url = format!("{HF_BASE}/api/models?{}", qs.join("&"));
+
     let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("hf status {}", resp.status()));

@@ -2,6 +2,7 @@ mod chat;
 mod hf;
 mod paths;
 mod runtime;
+mod system;
 
 use runtime::InferenceState;
 
@@ -20,6 +21,7 @@ pub fn run() {
             hf::download_model,
             hf::list_local_models,
             chat::chat_stream,
+            system::system_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

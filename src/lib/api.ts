@@ -11,7 +11,20 @@ export type HfModel = {
   id: string;
   downloads: number;
   likes: number;
+  tags: string[];
+  lastModified: string | null;
+  pipeline_tag: string | null;
 };
+
+export type SystemInfo = {
+  ram_gb: number;
+  cpu: string;
+  os: string;
+};
+
+export function systemInfo(): Promise<SystemInfo> {
+  return invoke<SystemInfo>("system_info");
+}
 
 export type HfFile = {
   path: string;
@@ -49,8 +62,12 @@ export function onInstallOutput(
   ]);
 }
 
-export function searchHfModels(query: string): Promise<HfModel[]> {
-  return invoke<HfModel[]>("search_hf_models", { query });
+export function searchHfModels(
+  query: string,
+  sort: "trending" | "downloads" | "likes" | "lastModified" = "trending",
+  tags: string[] = [],
+): Promise<HfModel[]> {
+  return invoke<HfModel[]>("search_hf_models", { query, sort, tags });
 }
 
 export function listHfFiles(repo: string): Promise<HfFile[]> {

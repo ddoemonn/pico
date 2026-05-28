@@ -1,5 +1,6 @@
 <script lang="ts">
   import { detectLlamaServer, type LlamaServerStatus } from "../api";
+  import { app } from "../state.svelte";
 
   let status = $state<LlamaServerStatus | null>(null);
 
@@ -15,6 +16,15 @@
     <h1>settings</h1>
     <p class="sub">pico v0.1</p>
   </div>
+
+  {#if app.system}
+    <div class="group">
+      <div class="label">machine</div>
+      <div class="kv"><span class="k">cpu</span><span class="v">{app.system.cpu}</span></div>
+      <div class="kv"><span class="k">ram</span><span class="v">{app.system.ram_gb} GB</span></div>
+      <div class="kv"><span class="k">os</span><span class="v">{app.system.os}</span></div>
+    </div>
+  {/if}
 
   <div class="group">
     <div class="label">runtime</div>
