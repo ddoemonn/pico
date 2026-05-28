@@ -11,7 +11,7 @@
     type HfModel,
   } from "../api";
   import { app, fitVerdict, type FitVerdict } from "../state.svelte";
-  import { parseQuant, quantStars } from "../quant";
+  import { parseQuant, quantTier } from "../quant";
 
   type Sort = "trendingScore" | "downloads" | "likes" | "lastModified";
 
@@ -248,8 +248,8 @@
                   >
                     <span class="file">{f.path}</span>
                     {#if q}
-                      <span class="quant" title="{q.code} · {q.hint}">
-                        <span class="stars">{quantStars(q)}</span>
+                      <span class="quant quant-{quantTier(q)}" title={q.hint}>
+                        {q.code}
                       </span>
                     {/if}
                     <span class="size">{formatBytes(f.size)}</span>
@@ -310,21 +310,21 @@
     min-width: 0;
   }
   h1 {
-    font-size: 24px;
+    font-size: 26px;
     margin: 0;
     font-weight: 600;
     letter-spacing: -0.015em;
   }
   .sub {
-    margin: 4px 0 0;
-    font-size: 11px;
+    margin: 6px 0 0;
+    font-size: 12px;
     font-family: var(--mono);
     color: var(--fg-mute);
   }
   .search input {
     width: 100%;
-    padding: 9px 12px;
-    font-size: 13px;
+    padding: 10px 14px;
+    font-size: 14px;
     border: 1px solid var(--line-strong);
     border-radius: var(--r);
     background: transparent;
@@ -355,8 +355,8 @@
     border: 1px solid var(--line);
     color: var(--fg-dim);
     font-family: var(--mono);
-    font-size: 11px;
-    padding: 5px 12px;
+    font-size: 12px;
+    padding: 6px 14px;
     border-radius: var(--r-pill);
     transition: color var(--t), border-color var(--t), background var(--t);
   }
@@ -418,7 +418,7 @@
   }
   .name {
     flex: 1;
-    font-size: 13px;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -441,10 +441,10 @@
   }
   .meta {
     display: flex;
-    gap: 14px;
+    gap: 16px;
     padding-left: 20px;
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-mute);
     flex-wrap: wrap;
   }
@@ -492,13 +492,24 @@
   }
   .quant {
     font-family: var(--mono);
-    font-size: 10px;
-    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: var(--r-sm);
     flex-shrink: 0;
-    min-width: 40px;
+    letter-spacing: 0.02em;
   }
-  .stars {
-    letter-spacing: 1px;
+  .quant-high {
+    background: var(--accent-bg);
+    color: var(--accent);
+  }
+  .quant-mid {
+    background: var(--surface-hover);
+    color: var(--fg-dim);
+  }
+  .quant-low {
+    background: var(--warn-bg);
+    color: var(--warn);
   }
   .dl {
     display: flex;
@@ -544,7 +555,7 @@
   .file {
     flex: 1;
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -552,18 +563,18 @@
   }
   .size {
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-mute);
-    min-width: 64px;
+    min-width: 70px;
     text-align: right;
     flex-shrink: 0;
   }
   .fit {
     font-family: var(--mono);
-    font-size: 10px;
-    padding: 3px 8px;
+    font-size: 11px;
+    padding: 4px 10px;
     border-radius: var(--r-sm);
-    min-width: 64px;
+    min-width: 72px;
     text-align: center;
     flex-shrink: 0;
     letter-spacing: 0.02em;

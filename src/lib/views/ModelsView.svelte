@@ -141,7 +141,7 @@
     margin-bottom: 24px;
   }
   h1 {
-    font-size: 24px;
+    font-size: 26px;
     margin: 0;
     font-weight: 600;
     letter-spacing: -0.015em;

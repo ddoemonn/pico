@@ -7,6 +7,9 @@
   import ModelsView from "$lib/views/ModelsView.svelte";
   import SettingsView from "$lib/views/SettingsView.svelte";
   import { app } from "$lib/state.svelte";
+  import { theme } from "$lib/theme.svelte";
+
+  theme.init();
 
   let status = $state<LlamaServerStatus | null>(null);
   let loading = $state(true);
@@ -39,7 +42,8 @@
 {/if}
 
 <style>
-  :global(:root) {
+  :global(:root),
+  :global(:root[data-theme="light"]) {
     --bg: #fafafa;
     --fg: #1a1a1a;
     --fg-dim: rgba(26, 26, 26, 0.65);
@@ -55,6 +59,8 @@
     --warn-bg: rgba(200, 138, 0, 0.12);
     --danger: #d6443a;
     --danger-bg: rgba(214, 68, 58, 0.1);
+  }
+  :global(:root) {
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     --t: 120ms ease;
     --r-sm: 4px;
@@ -66,12 +72,12 @@
       -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     color: var(--fg);
     background: var(--bg);
-    font-size: 14px;
+    font-size: 15px;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.5;
+    line-height: 1.55;
   }
   @media (prefers-color-scheme: dark) {
-    :global(:root) {
+    :global(:root:not([data-theme="light"])) {
       --bg: #0f0f10;
       --fg: #ededed;
       --fg-dim: rgba(237, 237, 237, 0.65);
@@ -88,6 +94,23 @@
       --danger: #f87171;
       --danger-bg: rgba(248, 113, 113, 0.12);
     }
+  }
+  :global(:root[data-theme="dark"]) {
+    --bg: #0f0f10;
+    --fg: #ededed;
+    --fg-dim: rgba(237, 237, 237, 0.65);
+    --fg-mute: rgba(237, 237, 237, 0.4);
+    --surface: rgba(255, 255, 255, 0.04);
+    --surface-hover: rgba(255, 255, 255, 0.08);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --accent: #4ade80;
+    --accent-strong: #6ee7a3;
+    --accent-bg: rgba(74, 222, 128, 0.12);
+    --warn: #facc15;
+    --warn-bg: rgba(250, 204, 21, 0.12);
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.12);
   }
   :global(body) {
     margin: 0;

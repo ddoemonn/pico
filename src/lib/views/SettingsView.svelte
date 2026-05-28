@@ -1,6 +1,7 @@
 <script lang="ts">
   import { detectLlamaServer, type LlamaServerStatus } from "../api";
   import { app } from "../state.svelte";
+  import { theme, type Theme } from "../theme.svelte";
 
   let status = $state<LlamaServerStatus | null>(null);
 
@@ -9,12 +10,35 @@
   async function refresh() {
     status = await detectLlamaServer();
   }
+
+  const themeOptions: { id: Theme; label: string }[] = [
+    { id: "auto", label: "auto" },
+    { id: "light", label: "light" },
+    { id: "dark", label: "dark" },
+  ];
 </script>
 
 <section class="view">
   <div class="header">
     <h1>settings</h1>
     <p class="sub">pico v0.1</p>
+  </div>
+
+  <div class="group">
+    <div class="label">theme</div>
+    <div class="segmented" role="tablist" aria-label="Theme">
+      {#each themeOptions as o}
+        <button
+          class="seg"
+          class:active={theme.current === o.id}
+          role="tab"
+          aria-selected={theme.current === o.id}
+          onclick={() => theme.set(o.id)}
+        >
+          {o.label}
+        </button>
+      {/each}
+    </div>
   </div>
 
   {#if app.system}
@@ -66,7 +90,7 @@
     margin-bottom: 28px;
   }
   h1 {
-    font-size: 24px;
+    font-size: 26px;
     margin: 0;
     font-weight: 600;
     letter-spacing: -0.015em;
@@ -122,5 +146,32 @@
     font-size: 12px;
     margin: 0;
     display: inline-block;
+  }
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .seg {
+    background: transparent;
+    border: none;
+    padding: 7px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-dim);
+    border-right: 1px solid var(--line-strong);
+    transition: background var(--t), color var(--t);
+  }
+  .seg:last-child {
+    border-right: none;
+  }
+  .seg:hover {
+    color: var(--fg);
+    background: var(--surface);
+  }
+  .seg.active {
+    background: var(--accent-bg);
+    color: var(--accent);
   }
 </style>

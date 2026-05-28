@@ -2,12 +2,18 @@
 
 Local AI in 5MB. A native client for llama.cpp.
 
+![size comparison](assets/size.png)
+
 ```
-LM Studio     ████████████████████████  556 MB
-Jan           ████████████████████      500 MB
-Ollama        ████████                  200 MB
-pico          ▏                         3.3 MB
+macOS installer download size
+
+LM Studio     ████████████████████████████  556 MB
+Ollama        ████████                      160 MB
+Jan                                          95 MB
+pico          ▏                               2 MB
 ```
+
+Sources: [lmstudio.ai/download](https://lmstudio.ai/download), [Ollama releases](https://github.com/ollama/ollama/releases/latest), [Jan releases](https://github.com/janhq/jan/releases/latest).
 
 ## Why this exists
 

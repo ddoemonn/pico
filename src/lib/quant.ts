@@ -40,7 +40,9 @@ export function parseQuant(filename: string): QuantInfo | null {
   return null;
 }
 
-export function quantStars(q: QuantInfo | null): string {
-  if (!q) return "";
-  return "★".repeat(q.quality) + "·".repeat(5 - q.quality);
+export function quantTier(q: QuantInfo | null): "high" | "mid" | "low" {
+  if (!q) return "mid";
+  if (q.quality >= 4) return "high";
+  if (q.quality >= 3) return "mid";
+  return "low";
 }
